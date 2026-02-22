@@ -184,6 +184,7 @@ exports.signUP = async (req, res) => {
 
 
 exports.login = async (req, res) => {
+  console.time("LOGIN_API");
   try {
     const { email, password, revokeDeletion, latitude, longitude } = req.body;
 
@@ -257,50 +258,50 @@ exports.login = async (req, res) => {
       user.deleteScheduledAt = null;
       await user.save();
 
-      await mailSender(
-        user.email,
-        "Account Deletion Cancelled",
-        removeAccountDeletionTemplate(
-          user.firstName + " " + user.lastName,
-          user.email,
-        ),
-      );
+      // await mailSender(
+      //   user.email,
+      //   "Account Deletion Cancelled",
+      //   removeAccountDeletionTemplate(
+      //     user.firstName + " " + user.lastName,
+      //     user.email,
+      //   ),
+      // );
     }
 
-    let locationData = {};
+    // let locationData = {};
 
-    if (latitude && longitude) {
-      const address = await getAddressFromCoordinates(latitude, longitude);
+    // if (latitude && longitude) {
+    //   const address = await getAddressFromCoordinates(latitude, longitude);
 
-      locationData = {
-        latitude,
-        longitude,
-        fullAddress: address?.fullAddress || null,
-        city: address?.city || null,
-        state: address?.state || null,
-        country: address?.country || null,
-        pincode: address?.pincode || null,
-      };
-    }
+    //   locationData = {
+    //     latitude,
+    //     longitude,
+    //     fullAddress: address?.fullAddress || null,
+    //     city: address?.city || null,
+    //     state: address?.state || null,
+    //     country: address?.country || null,
+    //     pincode: address?.pincode || null,
+    //   };
+    // }
 
     // console.log("Location:", locationData);
 
-    const deviceInfo = getDeviceDetails(req);
-    deviceInfo.ipAddress = getClientIP(req);
+    // const deviceInfo = getDeviceDetails(req);
+    // deviceInfo.ipAddress = getClientIP(req);
 
-    await Profile.findByIdAndUpdate(user.additionalDetails._id, {
-      $push: {
-        loginHistory: {
-          $each: [
-            {
-              ...deviceInfo,
-              location: locationData,
-            },
-          ],
-          $slice: -2, 
-        },
-      },
-    });
+    // await Profile.findByIdAndUpdate(user.additionalDetails._id, {
+    //   $push: {
+    //     loginHistory: {
+    //       $each: [
+    //         {
+    //           ...deviceInfo,
+    //           location: locationData,
+    //         },
+    //       ],
+    //       $slice: -2, 
+    //     },
+    //   },
+    // });
 
     const payload = {
       id: user._id,
@@ -315,15 +316,15 @@ exports.login = async (req, res) => {
  
     user.password = undefined;
 
-    await mailSender(
-      user.email,
-      "New Login Detected",
-      loginAlertEmailTemplate(
-        `${user.firstName} ${user.lastName}`,
-        user.email,
-        deviceInfo
-      )
-    );
+    // await mailSender(
+    //   user.email,
+    //   "New Login Detected",
+    //   loginAlertEmailTemplate(
+    //     `${user.firstName} ${user.lastName}`,
+    //     user.email,
+    //     deviceInfo
+    //   )
+    // );
 
     const cookieOptions = {
       expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
@@ -332,6 +333,7 @@ exports.login = async (req, res) => {
       sameSite: "None", 
     };
 
+    console.timeEnd("LOGIN_API");
 
     return res
       .cookie("token", token, cookieOptions)
