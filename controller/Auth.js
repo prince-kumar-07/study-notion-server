@@ -7,18 +7,16 @@ const jwt = require("jsonwebtoken")
 require("dotenv").config()
 const passwordUpdatedTemplate = require("../mail/templates/passwordUpdate");
 const signupEmailTemplate = require("../mail/templates/signupEmailTemplate");
-const loginAlertEmailTemplate = require("../mail/templates/loginEmailTemplate");
-const mailSender = require("../utils/mailSender");
-const UAParser = require("ua-parser-js");
-const DeviceDetector = require("device-detector-js");
-const axios = require("axios");
+
 const removeAccountDeletionTemplate = require("../mail/templates/removeAccountDeletion")
-// const requestIp = require("request-ip");
+const sendEmail = require("../utils/mailSender")
+const {getDeviceDetails, getClientIP, getAddressFromCoordinates} = require("../utils/deviceInfo")
+const loginEmailTemplate = require("../mail/templates/loginEmailTemplate")
 
 
-// sendOTP
+
 exports.sendOTP = async (req, res, next) => {
-  // console.log("sendOTP HIT", typeof next);
+
   try {
     
     const { email } = req.body;
@@ -32,7 +30,7 @@ exports.sendOTP = async (req, res, next) => {
       });
     }
 
-  
+
     var otp = otpGenerater.generate(6, {
       upperCaseAlphabets: false,
       lowerCaseAlphabets: false,
@@ -74,10 +72,9 @@ exports.sendOTP = async (req, res, next) => {
   }
 };
 
-// signUP
 
 exports.signUP = async (req, res) => {
- 
+  console.time("SIGNUP_TIME");
   try {
     const {
       firstName,
@@ -162,16 +159,20 @@ exports.signUP = async (req, res) => {
 
     user.password = undefined;
 
-    await mailSender(
+
+    await sendEmail(
           user.email,
+          user.firstName + " " + user.lastName,
           "Welcome to Study Notion — Your Account Has Been Created",
           signupEmailTemplate(user.firstName+" "+user.lastName, user.email, user.accountType),
         );
 
+        console.timeEnd("SIGNUP_TIME");
+
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      // user,
+   
     });
   } catch (error) {
     console.error("Signup Error:", error);
@@ -184,9 +185,11 @@ exports.signUP = async (req, res) => {
 
 
 exports.login = async (req, res) => {
-  console.time("LOGIN_API");
+ console.time("LOGIN_TIME");
   try {
-    const { email, password, revokeDeletion, latitude, longitude } = req.body;
+    
+   
+    const { email, password, revokeDeletion } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -250,58 +253,22 @@ exports.login = async (req, res) => {
         message: "Account scheduled for deletion",
       });
     }
-
  
     if (user.deleteRequested && revokeDeletion) {
-      
       user.deleteRequested = false;
       user.deleteScheduledAt = null;
       await user.save();
 
-      // await mailSender(
-      //   user.email,
-      //   "Account Deletion Cancelled",
-      //   removeAccountDeletionTemplate(
-      //     user.firstName + " " + user.lastName,
-      //     user.email,
-      //   ),
-      // );
+      await sendEmail(
+        email,
+        user.firstName + " " + user.lastName,
+        "Account Deletion Cancelled",
+        removeAccountDeletionTemplate(
+          user.firstName + " " + user.lastName,
+          user.email,
+        ),
+      );
     }
-
-    // let locationData = {};
-
-    // if (latitude && longitude) {
-    //   const address = await getAddressFromCoordinates(latitude, longitude);
-
-    //   locationData = {
-    //     latitude,
-    //     longitude,
-    //     fullAddress: address?.fullAddress || null,
-    //     city: address?.city || null,
-    //     state: address?.state || null,
-    //     country: address?.country || null,
-    //     pincode: address?.pincode || null,
-    //   };
-    // }
-
-    // console.log("Location:", locationData);
-
-    // const deviceInfo = getDeviceDetails(req);
-    // deviceInfo.ipAddress = getClientIP(req);
-
-    // await Profile.findByIdAndUpdate(user.additionalDetails._id, {
-    //   $push: {
-    //     loginHistory: {
-    //       $each: [
-    //         {
-    //           ...deviceInfo,
-    //           location: locationData,
-    //         },
-    //       ],
-    //       $slice: -2, 
-    //     },
-    //   },
-    // });
 
     const payload = {
       id: user._id,
@@ -313,28 +280,16 @@ exports.login = async (req, res) => {
       expiresIn: "2h",
     });
 
- 
-    user.password = undefined;
-
-    // await mailSender(
-    //   user.email,
-    //   "New Login Detected",
-    //   loginAlertEmailTemplate(
-    //     `${user.firstName} ${user.lastName}`,
-    //     user.email,
-    //     deviceInfo
-    //   )
-    // );
-
-    const cookieOptions = {
-      expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+     const cookieOptions = {
+      expires: new Date(Date.now() + 2 * 60 * 60 * 1000),
       httpOnly: true,
       secure: true, 
       sameSite: "None", 
     };
 
-    console.timeEnd("LOGIN_API");
+    user.password = undefined;
 
+     console.timeEnd("LOGIN_TIME");
     return res
       .cookie("token", token, cookieOptions)
       .status(200)
@@ -343,7 +298,7 @@ exports.login = async (req, res) => {
         token,
         user,
         message: "Login successful",
-      });
+      })
 
   } catch (error) {
     console.error("Login Error:", error);
@@ -353,10 +308,9 @@ exports.login = async (req, res) => {
       message: "Internal server error",
     });
   }
+  
 };
 
-
-// change Password
 
 exports.changePassword = async (req, res) => {
   try {
@@ -400,13 +354,17 @@ exports.changePassword = async (req, res) => {
     user.password = hashedNewPassword;
     await user.save();
 
-    await mailSender(
+
+        await sendEmail(
           user.email,
+          user.firstName + " " + user.lastName,
           "Password Changed Successfully",
-          passwordUpdatedTemplate(user.email, user.firstName +" "+user.lastName),
+          passwordUpdatedTemplate(
+            user.email,
+            user.firstName + " " + user.lastName,
+          ),
         );
     
-
     return res.status(200).json({
       success: true,
       message: "Password changed successfully",
@@ -423,121 +381,96 @@ exports.changePassword = async (req, res) => {
 }
 
 
-function getClientIP(req) {
-
-  let ip =
-    req.headers["x-forwarded-for"] ||
-    req.socket.remoteAddress ||
-    null;
-
-  if (ip && ip.includes(",")) {
-    ip = ip.split(",")[0];
-  }
-
-  // Convert IPv6 localhost to IPv4 localhost
-  if (ip === "::1") {
-    ip = "127.0.0.1";
-  }
-
-  // Remove IPv6 prefix
-  if (ip && ip.startsWith("::ffff:")) {
-    ip = ip.replace("::ffff:", "");
-  }
-
-  return ip;
-}
-
-
-
-function getDeviceDetails(req) {
-
-  const userAgent = req.headers["user-agent"];
-
-  const parser = new UAParser(userAgent);
-
-  const browser = parser.getBrowser();
-  const os = parser.getOS();
-  const device = parser.getDevice();
-
-  const detector = new DeviceDetector();
-
-  const deviceData = detector.parse(userAgent);
-
-  // Detect browser name correctly
-  let browserName = browser.name || "Unknown Browser";
-
-  // Detect Brave manually
-  if (userAgent.includes("Brave")) {
-    browserName = "Brave";
-  }
-
-  // Detect Edge
-  if (userAgent.includes("Edg")) {
-    browserName = "Microsoft Edge";
-  }
-
-  // Detect Chrome properly
-  if (userAgent.includes("Chrome") && !userAgent.includes("Edg")) {
-    browserName = "Chrome";
-  }
-
-  // Detect device type
-  let deviceType = "Desktop Computer";
-
-  if (deviceData.device && deviceData.device.type) {
-    deviceType = deviceData.device.type;
-  }
-
-  // Detect brand if available
-  let deviceBrand = deviceData.device?.brand || os.name;
-
-  return {
-
-    browserName: browserName,
-    browserVersion: browser.version,
-
-    osName: os.name,
-    osVersion: os.version,
-
-    deviceType: deviceType,
-
-    deviceBrand: deviceBrand,
-
-    fullDeviceName: `${deviceBrand} ${deviceType}`,
-
-  };
-
-}
-
-
-async function getAddressFromCoordinates(latitude, longitude) {
-
+exports.postLoginHandler = async (req, res) => {
   try {
+    const { latitude, longitude } = req.body;
+    // console.log(latitude, longitude )
 
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
 
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent": "studynotion-app"
-      }
-    });
+    const id = req.user.id;
+    //  console.log("id", id )
 
-    const data = response.data;
+    const deviceInfo = getDeviceDetails(req);
+    deviceInfo.ipAddress = getClientIP(req);
 
-    return {
-      fullAddress: data.display_name,
-      city: data.address.city || data.address.town || data.address.village,
-      state: data.address.state,
-      country: data.address.country,
-      pincode: data.address.postcode,
+    let locationData = null;
+
+   if (latitude && longitude) {
+  const address = await getAddressFromCoordinates(latitude, longitude);
+  //  console.log("addrees ", address )
+
+  locationData = {
+    latitude,
+    longitude,
+    fullAddress: address?.fullAddress || null,
+    city: address?.city || null,
+    state: address?.state || null,
+    country: address?.country || null,
+    pincode: address?.pincode || null,
+  };
+}
+    const user = await User.findById(id);
+
+    if (!user?.additionalDetails?._id) {
+      return res.status(200).json({
+        success: true,
+        message: "No profile details found",
+      });
+    }
+
+    const loginEntry = {
+      ...deviceInfo,
     };
 
+    if (locationData) {
+      loginEntry.location = locationData;
+    }
+
+    await Profile.findByIdAndUpdate(user.additionalDetails._id, {
+      $push: {
+        loginHistory: {
+          $each: [loginEntry],
+          $slice: -2,
+        },
+      },
+    });
+
+    // await sendEmail(
+    //   user.email,
+    //   user.firstName + " " + user.lastName,
+    //   "New Login Detected, - Study Notion",
+    //   loginEmailTemplate(
+    //     user.firstName + " " + user.lastName,
+    //     user.email,
+    //     deviceInfo,
+    //   ),
+    // );
+
+    return res.status(200).json({
+      success: true,
+      message: "Login details stored successfully",
+    });
+  } catch (error) {
+    console.error("PostLoginHandler Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to store login details",
+    });
   }
-  catch (error) {
+};
 
-    console.log("Reverse geolocation error:", error.message);
-    return null;
 
-  }
 
-}
+
+
+
+
+
+
+

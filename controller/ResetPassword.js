@@ -1,19 +1,15 @@
 const User = require("../model/User");
-const mailSender = require("../utils/mailSender");
+const sendEmail = require("../utils/mailSender")
 const bcrypt = require("bcrypt");
 require("dotenv").config()
 const passwordResetLinkEmail = require("../mail/templates/passwordResetLinkEmail");
 const passwordUpdatedTemplate = require("../mail/templates/passwordUpdate");
-//resetPasswordToken
 
 exports.resetPasswordToken = async (req, res) => {
   try {
     const email = req.body.email;
-
-   console.log(email)
-
     const user = await User.findOne({ email: email });
-    console.log(user)
+
     if (!user) {
       return res.status(404).json({
         message: "Your email is not registered with our database",
@@ -23,7 +19,7 @@ exports.resetPasswordToken = async (req, res) => {
 
     const token = crypto.randomUUID();
 
-    const updatedDetails = await User.findOneAndUpdate(
+     await User.findOneAndUpdate(
       { email: email },
       {
         token: token,
@@ -33,10 +29,10 @@ exports.resetPasswordToken = async (req, res) => {
     );
 
     const url = `${process.env.FRONTEND_URL}/reset-password/${token}/${email}`;
-     
 
-    await mailSender(
+    await sendEmail(
       email,
+      user.firstName + " " + user.lastName,
       "Password reset Link",
       passwordResetLinkEmail(url),
     );
@@ -103,12 +99,15 @@ exports.resetPassword = async (req, res) => {
 
     await userDetails.save();
 
-    await mailSender(
+    await sendEmail(
       userDetails.email,
+       userDetails.firstName + " " + userDetails.lastName,
       "Password Updated Successfully",
-      passwordUpdatedTemplate( userDetails.email, userDetails.firstName +" "+userDetails.lastName),
-    );
-
+      passwordUpdatedTemplate(
+        userDetails.email,
+        userDetails.firstName + " " + userDetails.lastName,
+      )
+    )
 
     return res.status(200).json({
       success: true,

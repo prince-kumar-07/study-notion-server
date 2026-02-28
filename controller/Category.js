@@ -16,7 +16,7 @@ exports.createCategory = async (req, res) => {
       description: description,
     });
 
-    console.log(categoryDetails);
+    // console.log(categoryDetails);
 
     return res.status(200).json({
       success: true,
@@ -56,7 +56,7 @@ exports.showAllCategories = async (req, res) => {
 
 exports.categoryPageDetails = async (req, res) => {
   try {
-    const { categoryId } = req.body;
+    const { categoryId } = req.query;
 
     if (!categoryId) {
       return res.status(400).json({
@@ -66,8 +66,13 @@ exports.categoryPageDetails = async (req, res) => {
     }
 
     const categoryDetails = await Category.findById(categoryId)
-      .populate("courses")
-      .exec();
+  .populate({
+    path: "courses",
+    populate: {
+      path: "courseContents"
+    }
+  })
+  .exec();
 
     if (!categoryDetails) {
       return res.status(404).json({
@@ -97,6 +102,51 @@ exports.categoryPageDetails = async (req, res) => {
       success: false,
       message:
         "Something went wrong while fetching category details from Database",
+    });
+  }
+};
+
+
+
+exports.updateCategory = async (req, res) => {
+  try {
+    const { name, description, category_id } = req.body;
+
+    if (!name || !description || !category_id) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    const existingCategory = await Category.findById(category_id);
+
+    if (!existingCategory) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    await Category.findByIdAndUpdate(
+      category_id,
+      {
+        name,
+        description,
+      },
+      { new: true },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Category updated successfully",
+    });
+  } catch (error) {
+    console.error("Update category Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while updating category",
     });
   }
 };

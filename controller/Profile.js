@@ -2,8 +2,7 @@ const Profile = require("../model/Profile");
 const User = require("../model/User");
 const { uploadImageToCloudinary } = require("../utils/imageUploder");
 const accountDeleteRequestTemplate = require("../mail/templates/accountDeleteRequest");
-const cancelDeleteAccountTemplate = require("../mail/templates/cancelDeleteAccount");
-const mailSender = require("../utils/mailSender");
+const sendEmail = require("../utils/mailSender")
 
 
 exports.getProfile = async (req, res) => {
@@ -279,9 +278,6 @@ exports.getEnrolledCourses = async (req, res) => {
 
 exports.scheduleDeleteAccount = async (req, res) => {
 
-    
-    // console.log(userId)
-
 
   try {
     const userId = req.user.id;
@@ -296,11 +292,18 @@ exports.scheduleDeleteAccount = async (req, res) => {
       deleteScheduledAt: deleteDate,
     });
 
-    await mailSender(
+
+    await sendEmail(
       user.email,
+      user.firstName + " " + user.lastName,
       "Account Deletion Request Received - Study Notion",
-      accountDeleteRequestTemplate(user.firstName+" "+user.lastName, user.email, deleteDate),
+      accountDeleteRequestTemplate(
+        user.firstName + " " + user.lastName,
+        user.email,
+        deleteDate,
+      ),
     );
+        
 
     res.json({
       success: true,

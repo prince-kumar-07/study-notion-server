@@ -19,6 +19,7 @@ const contact = require("./routes/ContactUs");
 const port = process.env.PORT || 4000;
 
 
+
 app.set("trust proxy", 1);
 
 
@@ -40,7 +41,7 @@ app.use(
   })
 );
 
-// THEN MIDDLEWARES
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(
@@ -50,18 +51,18 @@ app.use(
   })
 );
 
-// DB + Cloud
+
 connectDB();
 cloudinaryConnect();
 
-// ROUTES
+
 app.use("/api/v1/auth", userRoute);
 app.use("/api/v1/payment", paymnetRouter);
 app.use("/api/v1/profile", profileRouter);
 app.use("/api/v1/course", courseRouter);
 app.use("/api/v1/contact", contact);
 
-// TEST ROUTE
+
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,

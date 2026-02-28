@@ -10,10 +10,12 @@ const categorySchema  = new moongose.Schema({
     description: {
         type:String
     },
-    courses: {
-        type: moongose.Schema.Types.ObjectId,
-        ref:"Course"
-    }
+    courses: [
+  {
+    type: moongose.Schema.Types.ObjectId,
+    ref: "Course"
+  }
+]
 
 })
     

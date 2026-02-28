@@ -7,7 +7,7 @@ require("dotenv").config();
 
 exports.createCourse = async (req, res) => {
 
-  console.log(req.body)
+  // console.log(req.body)
   try {
     const {
       courseName,
@@ -41,7 +41,7 @@ exports.createCourse = async (req, res) => {
     const userId = req.user.id;
     const instructorDeatils = await User.findById(userId);
 
-    console.log("instructorDeatils " + instructorDeatils);
+    // console.log("instructorDeatils " + instructorDeatils);
 
     if (!instructorDeatils) {
       console.error("instructor not found");
@@ -155,44 +155,54 @@ exports.getAllCourses = async (req, res) => {
 
 exports.getCourseDetails = async (req, res) => {
   try {
-    const { _id } = req.body;
-    const courseId = _id;
+    const { courseId } = req.params;
+    // console.log(courseId)
 
-    const courseDetails = await Course.find({ _id: courseId })
+    const courseDetails = await Course.findById(courseId)
       .populate({
         path: "instructor",
         populate: {
           path: "additionalDetails",
         },
       })
-      .populate("category")
-      .populate("ratingAndReview")
       .populate({
-        path: "courseContent",
+        path: "category",
+        select: "name description"  
+      })
+      // .populate("ratingAndReview")
+      .populate({
+        path: "courseContents",
         populate: {
           path: "subSection",
+          select: "title description timeDuration"  
         },
-      }).exec();
+      })
+      .select("-studentEnrolled") 
+      .exec();
 
-    if (!courseDetails || courseDetails.length === 0) {
-      console.error("course not found");
+    if (!courseDetails) {
       return res.status(404).json({
         success: false,
-        message: `course not found for id ${courseId}`,
+        message: "Course not found",
       });
     }
+
+    return res.status(200).json({
+      success: true,
+      data: courseDetails,
+    });
+
   } catch (error) {
-    console.error("error while fetching course details:", error);
+    console.error(error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };
 
 exports.deleteCourse = async (req, res) => {
-  console.log(req)
+  // console.log(req)
   try {
 
    const { courseId } = req.body;
@@ -271,8 +281,8 @@ exports.updateCourse = async (req, res) => {
     courseId = String(courseId);
     category = String(category);
 
-    console.log("courseId:", courseId);
-    console.log("category:", category);
+    // console.log("courseId:", courseId);
+    // console.log("category:", category);
 
     const updatedCourse = await Course.findByIdAndUpdate(
       courseId,
@@ -433,6 +443,116 @@ exports.fetchEntireCourse = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || "Internal server error",
+    });
+
+  }
+};
+
+
+exports.getEnrolledCourses = async (req, res) => {
+  const studentId = req.params.userId
+  // console.log(req.params.userId)
+  try {
+
+    
+
+    const userDetails = await User.findById(studentId)
+      .populate({
+        path: "courses",
+        select:
+          "courseName price thumbnail instructor courseDescription whatYouWillLearn tag category ",
+
+        populate: [
+          {
+            path: "instructor",
+            select: "_id firstName lastName",
+          },
+          {
+            path: "category",
+            select: "_id name",
+          },
+          // {
+          //   // populate sections
+          //   path: "courseContents",
+          //   populate: {
+          //     // populate subsections
+          //     path: "subSection",
+          //   },
+          // },
+        ],
+      })
+      .exec();
+
+    return res.status(200).json({
+      success: true,
+      message: "Enrolled courses fetched successfully",
+      data: userDetails.courses,
+    });
+
+  } catch (error) {
+
+    console.error("Error while fetching enrolled courses:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+
+  }
+};
+
+exports.getEnrolledCourseDetails = async (req, res) => {
+  try {
+
+    const { courseId } = req.params;
+
+    if (!courseId) {
+      return res.status(400).json({
+        success: false,
+        message: "Course ID is required",
+      });
+    }
+
+    const courseDetails = await Course.findById(courseId)
+      .populate({
+        path: "instructor",
+        select: "_id firstName lastName email",
+      })
+      .populate({
+        path: "category",
+        select: "_id name",
+      })
+      // .populate({
+      //   path: "ratingAndReview",
+      // })
+      .populate({
+        path: "courseContents",
+        populate: {
+          path: "subSection",
+        },
+      })
+      .exec();
+
+    if (!courseDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Course details fetched successfully",
+      data: courseDetails,
+    });
+
+  } catch (error) {
+
+    console.error("Error fetching course details:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch course details",
     });
 
   }

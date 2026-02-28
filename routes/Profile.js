@@ -19,10 +19,6 @@ const {
 } = require("../controller/Profile")
 
 
-// ********************************************************************************************************
-//                                      Profile routes
-// ********************************************************************************************************
-// Delet User Account
 router.delete("/deleteProfile", auth, scheduleDeleteAccount)
 router.put("/updateProfile", auth, updateProfile)
 // route
